@@ -5,7 +5,7 @@ A Django web application that uses GPT-4-Turbo to analyze coding patterns and ta
 ## Features
 
 - Interactive code editor with syntax highlighting
-- AI-powered code analysis using GPT-4-Turbo
+- AI-powered code analysis using GPT-3.5-Turbo
 - Personalized learning resources based on coding patterns
 - Custom coding challenges tailored to skill level
 - Code optimization and explanation
