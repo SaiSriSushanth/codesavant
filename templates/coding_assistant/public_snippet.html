@@ -1,0 +1,542 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ snippet.title }} - CodeSavant{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/default.min.css">
+<style>
+    /* Code container styles */
+    .code-container {
+        position: relative;
+        height: 600px;
+        border-radius: 0 0 0.25rem 0.25rem;
+    }
+    
+    .CodeMirror {
+        height: 100%;
+        font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 16px;
+        line-height: 1.5;
+    }
+    
+    .CodeMirror-gutters {
+        padding-right: 10px;
+    }
+    
+    .CodeMirror-linenumber {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+    
+    /* Card styles */
+    .card {
+        border: none;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    }
+    
+    .card-header {
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    }
+    
+    /* Comment styles */
+    .comments-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    
+    .comment-card {
+        margin-bottom: 1.25rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .comment-card:last-child {
+        margin-bottom: 0;
+    }
+    
+    .comment-form {
+        position: sticky;
+        bottom: 0;
+        background-color: white;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+        z-index: 10;
+    }
+    
+    .comments-list {
+        position: relative;
+        z-index: 5;
+    }
+    
+    #comment-content {
+        resize: vertical;
+        min-height: 80px;
+        border-radius: 0.25rem;
+        padding: 0.75rem;
+        font-size: 0.95rem;
+    }
+    
+    /* Toast container */
+    #toast-container {
+        z-index: 1050;
+    }
+    
+    /* Button styles */
+    .btn-group .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .btn-group .btn i + i {
+        margin-left: 2px;
+        font-size: 0.75em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-code me-2"></i>{{ snippet.title }}</h5>
+                    <a href="{% url 'coding_assistant:explore' %}" class="btn btn-sm btn-outline-light"><i class="fas fa-arrow-left me-1"></i>Back to Explore</a>
+                </div>
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-primary">{{ snippet.language }}</span>
+                            <small class="text-muted ms-2"><i class="fas fa-user me-1"></i>{{ snippet.user.username }} <i class="far fa-calendar-alt ms-2 me-1"></i>{{ snippet.created_at|date:"F j, Y" }}</small>
+                        </div>
+                        <div class="btn-group">
+                            <button id="decrease-font" class="btn btn-sm btn-outline-secondary" title="Decrease font size"><i class="fas fa-font"></i><i class="fas fa-minus"></i></button>
+                            <button id="increase-font" class="btn btn-sm btn-outline-secondary" title="Increase font size"><i class="fas fa-font"></i><i class="fas fa-plus"></i></button>
+                            <button id="toggle-theme" class="btn btn-sm btn-outline-secondary" title="Toggle theme"><i class="fas fa-adjust"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="code-container">
+                        <textarea id="code-viewer">{{ snippet.code }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4 shadow-sm h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-comments me-2"></i>Comments ({{ comments|length }})</h5>
+                </div>
+                <div class="card-body comments-container">
+                    {% if comments %}
+                    <div class="comments-list mb-4">
+                        {% for comment in comments %}
+                        <div class="comment-card" id="comment-{{ comment.id }}">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0"><i class="fas fa-user-circle me-2"></i>{{ comment.user.username }}</h6>
+                                <small class="text-muted"><i class="far fa-clock me-1"></i>{{ comment.created_at|date:"F j, Y, g:i a" }}</small>
+                            </div>
+                            <p class="mb-0">{{ comment.content }}</p>
+                        </div>
+                        {% if not forloop.last %}{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 mb-4">
+                        <i class="far fa-comment-dots fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No comments yet. Be the first to comment!</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if user.is_authenticated %}
+                    <div class="comment-form">
+                        <h6><i class="fas fa-reply me-2"></i>Add a Comment</h6>
+                        <div class="mb-3">
+                            <textarea id="comment-content" class="form-control" rows="3" placeholder="Write your comment here... (Ctrl+Enter to submit)"></textarea>
+                        </div>
+                        <button id="submit-comment" class="btn btn-primary"><i class="fas fa-paper-plane me-2"></i>Post Comment</button>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info text-center py-3 comment-form">
+                        <p class="mb-0"><i class="fas fa-lock me-2"></i>You must be logged in to post comments.</p>
+                        <a href="{% url 'login' %}?next={{ request.path }}" class="btn btn-primary mt-2"><i class="fas fa-sign-in-alt me-2"></i>Log in now</a>
+                        <p class="small text-muted mt-2">You will be redirected back to this page after login.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/php/php.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/ruby/ruby.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/go/go.min.js"></script>
+
+<script>
+            console.log('DOM content loaded script starting');
+            
+            // Get CSRF token from cookie
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM fully loaded and parsed');
+        console.log('DOM Content Loaded');
+        // Initialize CodeMirror
+        const codeViewer = document.getElementById('code-viewer');
+        console.log('Code viewer element:', codeViewer);
+        const editor = CodeMirror.fromTextArea(codeViewer, {
+            lineNumbers: true,
+            mode: getLanguageMode('{{ snippet.language }}'),
+            theme: 'dracula',
+            readOnly: true,
+            lineWrapping: false,
+            indentUnit: 4,
+            smartIndent: true,
+            tabSize: 4,
+            indentWithTabs: false,
+            matchBrackets: true,
+            autoCloseBrackets: true,
+            styleActiveLine: true
+        });
+        
+        // Font size controls
+        let fontSize = 16;
+        const minFontSize = 12;
+        const maxFontSize = 24;
+        
+        document.getElementById('increase-font').addEventListener('click', function() {
+            if (fontSize < maxFontSize) {
+                fontSize += 2;
+                document.querySelector('.CodeMirror').style.fontSize = fontSize + 'px';
+            }
+        });
+        
+        document.getElementById('decrease-font').addEventListener('click', function() {
+            if (fontSize > minFontSize) {
+                fontSize -= 2;
+                document.querySelector('.CodeMirror').style.fontSize = fontSize + 'px';
+            }
+        });
+        
+        // Theme toggle
+        let isDarkTheme = true;
+        document.getElementById('toggle-theme').addEventListener('click', function() {
+            if (isDarkTheme) {
+                editor.setOption('theme', 'default');
+            } else {
+                editor.setOption('theme', 'dracula');
+            }
+            isDarkTheme = !isDarkTheme;
+        });
+        
+     // Comment submission
+            let commentContentField, submitCommentBtn;
+            try {
+                commentContentField = document.getElementById('comment-content');
+                console.log('Comment content field:', commentContentField);
+                submitCommentBtn = document.getElementById('submit-comment');
+                console.log('Submit comment button:', submitCommentBtn);
+                
+                if (!commentContentField) {
+                    console.error('Comment content field not found!');
+                }
+                
+                if (!submitCommentBtn) {
+                    console.error('Submit comment button not found!');
+                }
+            } catch (error) {
+                console.error('Error setting up comment elements:', error);
+            }
+            
+            console.log('Submit button:', submitCommentBtn);
+        console.log('Comment field:', commentContentField);
+        
+        if (submitCommentBtn && commentContentField) {
+            // Add event listener for Enter key in textarea
+            commentContentField.addEventListener('keydown', function(e) {
+                // Submit on Ctrl+Enter or Cmd+Enter
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    submitCommentBtn.click();
+                }
+            });
+            
+                submitCommentBtn.addEventListener('click', function() {
+                    console.log('Submit button clicked');
+                    const content = commentContentField.value.trim();
+                    console.log('Comment content:', content);
+                    
+                    if (!content) {
+                        // Show toast instead of alert
+                        console.log('Empty comment, showing warning');
+                        showToast('Please enter a comment', 'warning');
+                        return;
+                    }
+                    
+                    // Show loading state
+                    const originalBtnText = submitCommentBtn.innerHTML;
+                    submitCommentBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
+                    submitCommentBtn.disabled = true;
+                    console.log('Button state changed to loading');
+                
+                    try {                      // Get CSRF token from cookie using the function defined outside
+                        const csrftoken = getCookie('csrftoken');
+                        console.log('Submitting comment:', content);
+                        console.log('Snippet ID:', {{ snippet.id }});
+                        console.log('CSRF Token from cookie:', csrftoken);
+                        console.log('CSRF Token from template:', '{{ csrf_token }}');
+                        
+                        console.log('Starting fetch request to:', '{% url "coding_assistant:add_comment" %}');
+                        const requestBody = JSON.stringify({
+                            snippet_id: {{ snippet.id }},
+                            content: content
+                        });
+                        console.log('Request body:', requestBody);
+                        
+                        fetch('{% url "coding_assistant:add_comment" %}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrftoken
+                            },
+                            body: requestBody
+                        })
+                        .catch(fetchError => {
+                            console.error('Fetch error (network level):', fetchError);
+                            throw fetchError;
+                        })
+                        .then(response => {
+                            console.log('Response status:', response.status);
+                            console.log('Response headers:', response.headers);
+                            
+                            if (response.status === 302) {
+                                // Redirect to login page if not authenticated
+                                console.log('Authentication required, redirecting to login page');
+                                window.location.href = '{% url "login" %}?next={{ request.path }}';
+                                throw new Error('Authentication required');
+                            } else if (!response.ok) {
+                                return response.text().then(text => {
+                                    console.error('Error response text:', text);
+                                    // Show error message to user
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.className = 'alert alert-danger mt-3';
+                                    errorDiv.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>Error: ${response.status} ${response.statusText}`;
+                                    document.querySelector('.comment-form').prepend(errorDiv);
+                                    
+                                    setTimeout(() => {
+                                        errorDiv.remove();
+                                    }, 5000);
+                                    
+                                    throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
+                                });
+                            } else {
+                                console.log('Response OK, processing JSON');
+                                return response.json().then(data => {
+                                    console.log('Response data:', data);
+                                    return data;
+                                });
+                            }
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                // Show success message
+                                const successDiv = document.createElement('div');
+                                successDiv.className = 'alert alert-success mt-3';
+                                successDiv.innerHTML = `<i class="fas fa-check-circle me-2"></i>Comment posted successfully!`;
+                                document.querySelector('.comment-form').prepend(successDiv);
+                                
+                                setTimeout(() => {
+                                    successDiv.remove();
+                                }, 3000);
+                                
+                                // Add the new comment to the list
+                                let commentsList = document.querySelector('.comments-list');
+                                const noCommentsMsg = document.querySelector('.comments-container .text-center');
+                                
+                                if (noCommentsMsg) {
+                                    // Remove the "no comments" message if it exists
+                                    noCommentsMsg.remove();
+                                    
+                                    // Create a comments list if it doesn't exist
+                                    if (!commentsList) {
+                                        const newCommentsList = document.createElement('div');
+                                        newCommentsList.className = 'comments-list mb-4';
+                                        document.querySelector('.comment-form').before(newCommentsList);
+                                        commentsList = newCommentsList; // Update the commentsList variable
+                                    }
+                                }
+                                
+                                // Create the new comment element
+                                const commentElement = document.createElement('div');
+                                commentElement.className = 'comment-card';
+                                commentElement.id = `comment-${data.comment.id}`;
+                                commentElement.innerHTML = `
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0"><i class="fas fa-user-circle me-2"></i>${data.comment.user}</h6>
+                                        <small class="text-muted"><i class="far fa-clock me-1"></i>${data.comment.created_at}</small>
+                                    </div>
+                                    <p class="mb-0">${data.comment.content}</p>
+                                `;
+                                
+                                // Add it to the list
+                                commentsList = document.querySelector('.comments-list');
+                                if (commentsList) {
+                                    commentsList.prepend(commentElement);
+                                } else {
+                                    console.error('Comments list element not found');
+                                    // Create a new comments list if it still doesn't exist
+                                    const newCommentsList = document.createElement('div');
+                                    newCommentsList.className = 'comments-list mb-4';
+                                    document.querySelector('.comment-form').before(newCommentsList);
+                                    newCommentsList.prepend(commentElement);
+                                }
+                                
+                                // Clear the input field
+                                commentContentField.value = '';
+                                
+                                // Update comment count
+                                try {
+                                    const commentsContainer = document.querySelector('.comments-container');
+                                    if (commentsContainer) {
+                                        const card = commentsContainer.closest('.card');
+                                        if (card) {
+                                            const commentCountElement = card.querySelector('.card-header h5');
+                                            if (commentCountElement) {
+                                                console.log('Found comment count element:', commentCountElement.textContent);
+                                                const match = commentCountElement.textContent.match(/\d+/);
+                                                const currentCount = match ? parseInt(match[0]) : 0;
+                                                console.log('Current comment count:', currentCount);
+                                                commentCountElement.innerHTML = `<i class="fas fa-comments me-2"></i>Comments (${currentCount + 1})`;
+                                                console.log('Updated comment count to:', currentCount + 1);
+                                            } else {
+                                                console.error('Comment count element not found in card header');
+                                            }
+                                        } else {
+                                            console.error('Card element not found for comments container');
+                                        }
+                                    } else {
+                                        console.error('Comments container not found');
+                                    }
+                                } catch (error) {
+                                    console.error('Error updating comment count:', error);
+                                }
+                                
+                                // Show success toast
+                                showToast('Comment posted successfully!', 'success');
+                            } else {
+                                // Show error toast
+                                showToast('Error: ' + (data.error || 'Failed to post comment'), 'danger');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error in comment submission:', error);
+                            showToast('An error occurred: ' + error.message, 'danger');
+                        })
+                        .finally(() => {
+                            // Reset button state
+                            console.log('Resetting button state');
+                            submitCommentBtn.innerHTML = originalBtnText;
+                            submitCommentBtn.disabled = false;
+                        });
+                    } catch (error) {
+                        console.error('Error in fetch operation:', error);
+                        showToast('An error occurred while submitting the comment', 'danger');
+                        submitCommentBtn.innerHTML = originalBtnText;
+                        submitCommentBtn.disabled = false;
+                    }
+                });
+        }
+        
+        // Toast notification function
+        function showToast(message, type) {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+                toastContainer.style.zIndex = '5';
+                document.body.appendChild(toastContainer);
+            }
+            
+            // Create toast element
+            const toastId = 'toast-' + Date.now();
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type} border-0`;
+            toast.id = toastId;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            // Initialize and show the toast
+            const bsToast = new bootstrap.Toast(toast, {
+                autohide: true,
+                delay: 3000
+            });
+            bsToast.show();
+            
+            // Remove toast after it's hidden
+            toast.addEventListener('hidden.bs.toast', function() {
+                toast.remove();
+            });
+        }
+        
+        // Helper function to get CodeMirror mode from language
+        function getLanguageMode(language) {
+            const modeMap = {
+                'python': 'python',
+                'javascript': 'javascript',
+                'java': 'text/x-java',
+                'cpp': 'text/x-c++src',
+                'csharp': 'text/x-csharp',
+                'php': 'php',
+                'ruby': 'ruby',
+                'go': 'go',
+                'swift': 'text/x-swift',
+                'kotlin': 'text/x-kotlin'
+            };
+            return modeMap[language.toLowerCase()] || 'python';
+        }
+    });
+</script>
+{% endblock %}

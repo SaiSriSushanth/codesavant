@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ snippet.title }} - CodeSavant{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+<style>
+    .code-container {
+        height: 400px;
+    }
+    .CodeMirror {
+        height: 100%;
+        font-size: 14px;
+    }
+    .feedback-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    .feedback-card {
+        margin-bottom: 20px;
+    }
+    .feedback-card pre {
+        background-color: #282a36;
+        color: #f8f8f2;
+        border-radius: 4px;
+        padding: 10px;
+        overflow-x: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'coding_assistant:dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item active">{{ snippet.title }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0">{{ snippet.title }}</h1>
+            <div>
+                <button id="toggle-public-btn" class="btn {% if snippet.is_public %}btn-success{% else %}btn-outline-success{% endif %} me-2">
+                    <i class="fas {% if snippet.is_public %}fa-lock-open{% else %}fa-lock{% endif %} me-1"></i>
+                    {% if snippet.is_public %}Public{% else %}Make Public{% endif %}
+                </button>
+                <a href="{% url 'coding_assistant:code_editor' %}" class="btn btn-outline-primary">Back to Editor</a>
+            </div>
+        </div>
+        <p class="text-muted">
+            <span class="badge bg-secondary">{{ snippet.language }}</span>
+            <small class="ms-2">Last updated: {{ snippet.updated_at|date:"F j, Y, g:i a" }}</small>
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Code</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="code-container">
+                    <textarea id="code-viewer">{{ snippet.code }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">AI Feedback History</h5>
+            </div>
+            <div class="card-body feedback-container">
+                {% if feedbacks %}
+                    {% for feedback in feedbacks %}
+                    <div class="feedback-card">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Feedback #{{ forloop.counter }}</h6>
+                            <small class="text-muted">{{ feedback.created_at|date:"F j, Y, g:i a" }}</small>
+                        </div>
+                        <div class="feedback-content" id="feedback-{{ feedback.id }}">
+                            {{ feedback.feedback|linebreaks }}
+                        </div>
+                    </div>
+                    {% if not forloop.last %}<hr>{% endif %}
+                    {% endfor %}
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted">No feedback available for this snippet yet.</p>
+                    <a href="{% url 'coding_assistant:code_editor' %}" class="btn btn-primary">Get Feedback</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/php/php.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/ruby/ruby.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/go/go.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById('code-viewer'), {
+            lineNumbers: true,
+            mode: getLanguageMode('{{ snippet.language }}'),
+            theme: 'dracula',
+            readOnly: true
+        });
+        
+        // Format feedback content with markdown
+        const feedbacks = document.querySelectorAll('.feedback-content');
+        feedbacks.forEach(feedback => {
+            feedback.innerHTML = marked.parse(feedback.textContent.trim());
+        });
+        
+        // Toggle public/private status
+        const togglePublicBtn = document.getElementById('toggle-public-btn');
+        if (togglePublicBtn) {
+            togglePublicBtn.addEventListener('click', function() {
+                // Show loading state
+                const originalText = togglePublicBtn.innerHTML;
+                togglePublicBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+                togglePublicBtn.disabled = true;
+                
+                // Call API to toggle public status
+                fetch('{% url "coding_assistant:toggle_public" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        snippet_id: {{ snippet.id }}
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update button appearance
+                        if (data.is_public) {
+                            togglePublicBtn.classList.remove('btn-outline-success');
+                            togglePublicBtn.classList.add('btn-success');
+                            togglePublicBtn.innerHTML = '<i class="fas fa-lock-open me-1"></i> Public';
+                        } else {
+                            togglePublicBtn.classList.remove('btn-success');
+                            togglePublicBtn.classList.add('btn-outline-success');
+                            togglePublicBtn.innerHTML = '<i class="fas fa-lock me-1"></i> Make Public';
+                        }
+                        
+                        // Show success message
+                        const status = data.is_public ? 'public' : 'private';
+                        alert(`Snippet is now ${status}`);
+                    } else {
+                        // Show error and restore button
+                        alert('Error: ' + (data.error || 'Failed to update status'));
+                        togglePublicBtn.innerHTML = originalText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                    togglePublicBtn.innerHTML = originalText;
+                })
+                .finally(() => {
+                    togglePublicBtn.disabled = false;
+                });
+            });
+        }
+        
+        // Helper function to get CodeMirror mode from language
+        function getLanguageMode(language) {
+            const modeMap = {
+                'python': 'python',
+                'javascript': 'javascript',
+                'java': 'text/x-java',
+                'cpp': 'text/x-c++src',
+                'csharp': 'text/x-csharp',
+                'php': 'php',
+                'ruby': 'ruby',
+                'go': 'go',
+                'swift': 'text/x-swift',
+                'kotlin': 'text/x-kotlin'
+            };
+            return modeMap[language.toLowerCase()] || 'python';
+        }
+    });
+</script>
+{% endblock %}

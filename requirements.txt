@@ -1,0 +1,20 @@
+# Django and related packages
+Django==4.2.23
+django-crispy-forms==2.0
+crispy-bootstrap5==0.7
+
+# OpenAI API
+openai==1.90.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# For handling markdown content
+markdown==3.5
+
+# For development and testing
+django-debug-toolbar==4.2.0
+
+# For production deployment
+gunicorn==21.2.0
+whitenoise==6.5.0

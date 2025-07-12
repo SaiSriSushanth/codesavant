@@ -1,0 +1,612 @@
+{% extends 'base.html' %}
+
+{% block title %}Code Editor - CodeSavant{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+<style>
+    .editor-container {
+        height: calc(100vh - 200px);
+        min-height: 500px;
+    }
+    .CodeMirror {
+        height: 100%;
+        font-size: 14px;
+    }
+    .output-container {
+        height: 150px;
+        overflow-y: auto;
+        background-color: #282a36;
+        color: #f8f8f2;
+        font-family: monospace;
+        padding: 10px;
+        border-radius: 0 0 4px 4px;
+    }
+    .ai-container {
+        height: calc(100vh - 200px);
+        min-height: 500px;
+        overflow-y: auto;
+    }
+    .ai-response {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    .ai-response pre {
+        background-color: #282a36;
+        color: #f8f8f2;
+        border-radius: 4px;
+        padding: 10px;
+        overflow-x: auto;
+    }
+    .action-buttons {
+        position: absolute;
+        right: 10px;
+        top: 10px;
+        z-index: 100;
+    }
+    .loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h1 class="mb-3">Interactive Code Editor</h1>
+        <p class="text-muted">Write your code on the left, get AI assistance on the right</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Code Editor Column -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div>
+                    <input type="text" id="code-title" class="form-control" placeholder="Untitled Snippet">
+                </div>
+                <div>
+                    <select id="language-select" class="form-select">
+                        <option value="python">Python</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="java">Java</option>
+                        <option value="cpp">C++</option>
+                        <option value="csharp">C#</option>
+                        <option value="php">PHP</option>
+                        <option value="ruby">Ruby</option>
+                        <option value="go">Go</option>
+                        <option value="swift">Swift</option>
+                        <option value="kotlin">Kotlin</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="editor-container">
+                    <textarea id="code-editor"></textarea>
+                </div>
+                <div class="output-container" id="code-output">
+                    <div class="text-muted">// Output will appear here when you run your code</div>
+                </div>
+            </div>
+            <div class="card-footer bg-white">
+                <div class="d-flex justify-content-between">
+                    <button id="run-code" class="btn btn-success">
+                        <i class="fas fa-play me-2"></i>Run Code
+                    </button>
+                    <div>
+                        <button id="save-code" class="btn btn-primary me-2">
+                            <i class="fas fa-save me-2"></i>Save
+                        </button>
+                        <button id="clear-code" class="btn btn-outline-secondary">
+                            <i class="fas fa-trash-alt me-2"></i>Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI Assistant Column -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">CodeSavant Assistant</h5>
+                <div>
+                    <select id="ai-action" class="form-select">
+                        <option value="analyze">Analyze Code</option>
+                        <option value="optimize">Optimize Code</option>
+                        <option value="explain">Explain Code</option>
+                        <option value="debug">Debug Code</option>
+                        <option value="challenge">Suggest Challenge</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body p-0 position-relative">
+                <div class="action-buttons">
+                    <button id="get-resources" class="btn btn-sm btn-outline-info me-2" title="Get Learning Resources">
+                        <i class="fas fa-book"></i>
+                    </button>
+                    <button id="get-challenge" class="btn btn-sm btn-outline-warning" title="Get Coding Challenge">
+                        <i class="fas fa-trophy"></i>
+                    </button>
+                </div>
+                <div class="ai-container p-3" id="ai-responses">
+                    <div class="welcome-message">
+                        <h4>Welcome to CodeSavant!</h4>
+                        <p>I'm here to help you with your code. Write some code in the editor on the left, then click one of these buttons:</p>
+                        <ul>
+                            <li><strong>Analyze Code</strong>: I'll review your code for best practices and potential issues</li>
+                            <li><strong>Optimize Code</strong>: I'll suggest ways to make your code more efficient</li>
+                            <li><strong>Explain Code</strong>: I'll break down how your code works</li>
+                            <li><strong>Debug Code</strong>: I'll help identify and fix bugs</li>
+                            <li><strong>Suggest Challenge</strong>: I'll recommend a coding challenge based on your code</li>
+                        </ul>
+                        <p>You can also click the book icon to get learning resources or the trophy icon for a coding challenge.</p>
+                    </div>
+                </div>
+                <div class="loading-spinner" id="ai-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Getting AI response...</p>
+                </div>
+            </div>
+            <div class="card-footer bg-white">
+                <button id="analyze-code" class="btn btn-primary w-100">
+                    <i class="fas fa-robot me-2"></i>Get AI Feedback
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resources Modal -->
+<div class="modal fade" id="resourcesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Learning Resources</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="resources-container">
+                <div class="text-center py-4" id="resources-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Finding personalized resources...</p>
+                </div>
+                <div id="resources-content"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Challenge Modal -->
+<div class="modal fade" id="challengeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Coding Challenge</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="challenge-container">
+                <div class="text-center py-4" id="challenge-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Generating a personalized challenge...</p>
+                </div>
+                <div id="challenge-content"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- CodeMirror and dependencies -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/php/php.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/ruby/ruby.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/go/go.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize marked with default options
+        marked.use({ breaks: true });
+        
+        // Initialize CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+            lineNumbers: true,
+            mode: 'python',
+            theme: 'dracula',
+            matchBrackets: true,
+            indentUnit: 4,
+            tabSize: 4,
+            indentWithTabs: false,
+            lineWrapping: true,
+            autofocus: true
+        });
+
+        // Set initial sample code
+        editor.setValue('# Write your code here\n\ndef hello_world():\n    print("Hello, World!")\n\nhello_world()');
+
+        // Language selector
+        const languageSelect = document.getElementById('language-select');
+        languageSelect.addEventListener('change', function() {
+            const language = this.value;
+            const modeMap = {
+                'python': 'python',
+                'javascript': 'javascript',
+                'java': 'text/x-java',
+                'cpp': 'text/x-c++src',
+                'csharp': 'text/x-csharp',
+                'php': 'php',
+                'ruby': 'ruby',
+                'go': 'go',
+                'swift': 'text/x-swift',
+                'kotlin': 'text/x-kotlin'
+            };
+            editor.setOption('mode', modeMap[language] || 'python');
+            
+            // Set sample code based on language
+            const sampleCode = getSampleCode(language);
+            if (confirm('Change to sample code for ' + language + '?')) {
+                editor.setValue(sampleCode);
+            }
+        });
+
+        // Run code button
+        document.getElementById('run-code').addEventListener('click', function() {
+            const code = editor.getValue();
+            const language = languageSelect.value;
+            const output = document.getElementById('code-output');
+            
+            output.innerHTML = '<div class="text-info">Running code...</div>';
+            
+            // Send the code to our backend for execution
+            fetch('{% url "coding_assistant:run_code" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    code: code,
+                    language: language
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Create a container for the output
+                let outputHtml = '<div class="code-execution-result">';
+                
+                // Add output if available
+                if (data.output) {
+                    outputHtml += `<div class="output-section">
+                        <h6 class="output-header text-success">Output:</h6>
+                        <pre class="output-content bg-dark text-light p-3 rounded">${data.output}</pre>
+                    </div>`;
+                }
+                
+                // Add error if available
+                if (data.error) {
+                    outputHtml += `<div class="error-section mt-3">
+                        <h6 class="error-header text-danger">Error:</h6>
+                        <pre class="error-content bg-dark text-danger p-3 rounded">${data.error}</pre>
+                    </div>`;
+                    
+                    // If no output but there's an error, add a helpful message
+                    if (!data.output) {
+                        outputHtml += `<div class="mt-3 text-warning">
+                            <i class="fas fa-info-circle"></i> Your code encountered an error. Check the error message above for details.
+                        </div>`;
+                    }
+                }
+                
+                // If neither output nor error, show a message
+                if (!data.output && !data.error) {
+                    outputHtml += `<div class="text-info">Your code executed successfully but produced no output.</div>`;
+                }
+                
+                outputHtml += '</div>';
+                output.innerHTML = outputHtml;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                output.innerHTML = `<div class="text-danger">Error: ${error.message}</div>`;
+            })
+        });
+
+        // Clear code button
+        document.getElementById('clear-code').addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear the editor?')) {
+                editor.setValue('');
+                document.getElementById('code-output').innerHTML = '<div class="text-muted">// Output will appear here when you run your code</div>';
+            }
+        });
+
+        // Save code button
+        document.getElementById('save-code').addEventListener('click', function() {
+            const code = editor.getValue();
+            const title = document.getElementById('code-title').value || 'Untitled Snippet';
+            const language = languageSelect.value;
+            
+            // Show saving indicator
+            const saveBtn = this;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+            saveBtn.disabled = true;
+            
+            // Send the code to our backend for saving
+            fetch('{% url "coding_assistant:save_snippet" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    code: code,
+                    title: title,
+                    language: language
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Reset button state
+                saveBtn.innerHTML = originalText;
+                saveBtn.disabled = false;
+                
+                if (data.success) {
+                    // Show success message
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+                    alertDiv.setAttribute('role', 'alert');
+                    alertDiv.innerHTML = `
+                        <strong>Success!</strong> ${data.message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    document.body.appendChild(alertDiv);
+                    
+                    // Auto-dismiss after 3 seconds
+                    setTimeout(() => {
+                        const bsAlert = new bootstrap.Alert(alertDiv);
+                        bsAlert.close();
+                    }, 3000);
+                } else {
+                    // Show error message
+                    alert('Error: ' + (data.error || 'Failed to save code'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                saveBtn.innerHTML = originalText;
+                saveBtn.disabled = false;
+                alert('Error: ' + error.message);
+            });
+        });
+
+        // Analyze code button
+        document.getElementById('analyze-code').addEventListener('click', function() {
+            const code = editor.getValue();
+            const language = languageSelect.value;
+            const action = document.getElementById('ai-action').value;
+            const aiResponses = document.getElementById('ai-responses');
+            const aiLoading = document.getElementById('ai-loading');
+            
+            if (!code.trim()) {
+                alert('Please write some code first!');
+                return;
+            }
+            
+            // Show loading spinner
+            aiResponses.style.display = 'none';
+            aiLoading.style.display = 'block';
+            
+            // Call the API
+            fetch('{% url "coding_assistant:analyze_code" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    code: code,
+                    language: language,
+                    action: action,
+                    title: document.getElementById('code-title').value || `${language} snippet`
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loading spinner
+                aiLoading.style.display = 'none';
+                aiResponses.style.display = 'block';
+                
+                // Create response element
+                const responseElement = document.createElement('div');
+                responseElement.className = 'ai-response';
+                responseElement.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">${capitalizeFirstLetter(action)} Results</h5>
+                        <small class="text-muted">${new Date().toLocaleTimeString()}</small>
+                    </div>
+                    ${marked.parse(data.feedback || '')}
+                `;
+                
+                // Add to responses container
+                aiResponses.innerHTML = '';
+                aiResponses.appendChild(responseElement);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                aiLoading.style.display = 'none';
+                aiResponses.style.display = 'block';
+                aiResponses.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+            });
+        });
+
+        // Get learning resources
+        document.getElementById('get-resources').addEventListener('click', function() {
+            const language = languageSelect.value;
+            const resourcesModal = new bootstrap.Modal(document.getElementById('resourcesModal'));
+            const resourcesLoading = document.getElementById('resources-loading');
+            const resourcesContent = document.getElementById('resources-content');
+            
+            resourcesModal.show();
+            resourcesLoading.style.display = 'block';
+            resourcesContent.innerHTML = '';
+            
+            // Call the API
+            fetch(`{% url "coding_assistant:learning_resources" %}?language=${language}`)
+            .then(response => response.json())
+            .then(data => {
+                resourcesLoading.style.display = 'none';
+                
+                if (data.resources && data.resources.length > 0) {
+                    let html = '<div class="list-group">';
+                    data.resources.forEach(resource => {
+                        html += `
+                            <a href="${resource.url}" target="_blank" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">${resource.title}</h5>
+                                    <small class="text-${getResourceTypeColor(resource.type)}">${resource.type}</small>
+                                </div>
+                                <p class="mb-1">${resource.description}</p>
+                            </a>
+                        `;
+                    });
+                    html += '</div>';
+                    resourcesContent.innerHTML = html;
+                } else {
+                    resourcesContent.innerHTML = '<div class="alert alert-info">No resources found for this language. Try another language or check back later.</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resourcesLoading.style.display = 'none';
+                resourcesContent.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+            });
+        });
+
+        // Get coding challenge
+        document.getElementById('get-challenge').addEventListener('click', function() {
+            const language = languageSelect.value;
+            const challengeModal = new bootstrap.Modal(document.getElementById('challengeModal'));
+            const challengeLoading = document.getElementById('challenge-loading');
+            const challengeContent = document.getElementById('challenge-content');
+            
+            challengeModal.show();
+            challengeLoading.style.display = 'block';
+            challengeContent.innerHTML = '';
+            
+            // Call the API
+            fetch(`{% url "coding_assistant:coding_challenge" %}?language=${language}`)
+            .then(response => response.json())
+            .then(data => {
+                challengeLoading.style.display = 'none';
+                
+                if (data.challenge) {
+                    const challenge = data.challenge;
+                    challengeContent.innerHTML = `
+                        <div class="mb-4">
+                            <h4>${challenge.title}</h4>
+                            <span class="badge bg-${getDifficultyColor(challenge.difficulty)} mb-3">${challenge.difficulty}</span>
+                            <div class="challenge-description mb-3">
+                                ${marked.parse(challenge.description || '')}
+                            </div>
+                            <div class="card">
+                                <div class="card-header bg-dark text-white">Starter Code</div>
+                                <div class="card-body">
+                                    <pre><code class="language-${language}">${challenge.starter_code}</code></pre>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary mt-3" id="use-starter-code">Use This Code</button>
+                        </div>
+                    `;
+                    
+                    // Add event listener to the "Use This Code" button
+                    document.getElementById('use-starter-code').addEventListener('click', function() {
+                        editor.setValue(challenge.starter_code);
+                        challengeModal.hide();
+                    });
+                } else {
+                    challengeContent.innerHTML = '<div class="alert alert-info">No challenge available. Try another language or check back later.</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                challengeLoading.style.display = 'none';
+                challengeContent.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+            });
+        });
+
+        // Helper functions
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+
+        function getResourceTypeColor(type) {
+            const typeColors = {
+                'TUTORIAL': 'primary',
+                'DOCUMENTATION': 'secondary',
+                'EXERCISE': 'success',
+                'VIDEO': 'danger',
+                'ARTICLE': 'info'
+            };
+            return typeColors[type] || 'primary';
+        }
+
+        function getDifficultyColor(difficulty) {
+            const difficultyColors = {
+                'BEGINNER': 'success',
+                'INTERMEDIATE': 'warning',
+                'ADVANCED': 'danger'
+            };
+            return difficultyColors[difficulty] || 'primary';
+        }
+
+        function getSampleCode(language) {
+            const samples = {
+                'python': '# Python sample code\n\ndef fibonacci(n):\n    if n <= 0:\n        return []\n    elif n == 1:\n        return [0]\n    elif n == 2:\n        return [0, 1]\n    \n    fib = [0, 1]\n    for i in range(2, n):\n        fib.append(fib[i-1] + fib[i-2])\n    \n    return fib\n\nprint(fibonacci(10))',
+                'javascript': '// JavaScript sample code\n\nfunction fibonacci(n) {\n    if (n <= 0) {\n        return [];\n    } else if (n === 1) {\n        return [0];\n    } else if (n === 2) {\n        return [0, 1];\n    }\n    \n    const fib = [0, 1];\n    for (let i = 2; i < n; i++) {\n        fib.push(fib[i-1] + fib[i-2]);\n    }\n    \n    return fib;\n}\n\nconsole.log(fibonacci(10));',
+                'java': '// Java sample code\n\npublic class Fibonacci {\n    public static void main(String[] args) {\n        for (int num : fibonacci(10)) {\n            System.out.print(num + " ");\n        }\n    }\n    \n    public static int[] fibonacci(int n) {\n        if (n <= 0) {\n            return new int[0];\n        } else if (n == 1) {\n            return new int[]{0};\n        } else if (n == 2) {\n            return new int[]{0, 1};\n        }\n        \n        int[] fib = new int[n];\n        fib[0] = 0;\n        fib[1] = 1;\n        \n        for (int i = 2; i < n; i++) {\n            fib[i] = fib[i-1] + fib[i-2];\n        }\n        \n        return fib;\n    }\n}',
+                'cpp': '// C++ sample code\n\n#include <iostream>\n#include <vector>\n\nstd::vector<int> fibonacci(int n) {\n    if (n <= 0) {\n        return {};\n    } else if (n == 1) {\n        return {0};\n    } else if (n == 2) {\n        return {0, 1};\n    }\n    \n    std::vector<int> fib(n);\n    fib[0] = 0;\n    fib[1] = 1;\n    \n    for (int i = 2; i < n; i++) {\n        fib[i] = fib[i-1] + fib[i-2];\n    }\n    \n    return fib;\n}\n\nint main() {\n    auto result = fibonacci(10);\n    for (int num : result) {\n        std::cout << num << " ";\n    }\n    std::cout << std::endl;\n    return 0;\n}',
+                'csharp': '// C# sample code\n\nusing System;\nusing System.Collections.Generic;\n\nclass Program {\n    static void Main() {\n        foreach (int num in Fibonacci(10)) {\n            Console.Write($"{num} ");\n        }\n    }\n    \n    static List<int> Fibonacci(int n) {\n        if (n <= 0) {\n            return new List<int>();\n        } else if (n == 1) {\n            return new List<int> { 0 };\n        } else if (n == 2) {\n            return new List<int> { 0, 1 };\n        }\n        \n        List<int> fib = new List<int> { 0, 1 };\n        for (int i = 2; i < n; i++) {\n            fib.Add(fib[i-1] + fib[i-2]);\n        }\n        \n        return fib;\n    }\n}',
+                'php': '<?php\n// PHP sample code\n\nfunction fibonacci($n) {\n    if ($n <= 0) {\n        return [];\n    } else if ($n === 1) {\n        return [0];\n    } else if ($n === 2) {\n        return [0, 1];\n    }\n    \n    $fib = [0, 1];\n    for ($i = 2; $i < $n; $i++) {\n        $fib[] = $fib[$i-1] + $fib[$i-2];\n    }\n    \n    return $fib;\n}\n\nprint_r(fibonacci(10));',
+                'ruby': '# Ruby sample code\n\ndef fibonacci(n)\n    return [] if n <= 0\n    return [0] if n == 1\n    return [0, 1] if n == 2\n    \n    fib = [0, 1]\n    (2...n).each do |i|\n        fib << fib[i-1] + fib[i-2]\n    end\n    \n    fib\nend\n\nputs fibonacci(10).join(" ")',
+                'go': '// Go sample code\n\npackage main\n\nimport "fmt"\n\nfunc fibonacci(n int) []int {\n    if n <= 0 {\n        return []int{}\n    } else if n == 1 {\n        return []int{0}\n    } else if n == 2 {\n        return []int{0, 1}\n    }\n    \n    fib := make([]int, n)\n    fib[0] = 0\n    fib[1] = 1\n    \n    for i := 2; i < n; i++ {\n        fib[i] = fib[i-1] + fib[i-2]\n    }\n    \n    return fib\n}\n\nfunc main() {\n    result := fibonacci(10)\n    for _, num := range result {\n        fmt.Printf("%d ", num)\n    }\n}',
+                'swift': '// Swift sample code\n\nfunc fibonacci(_ n: Int) -> [Int] {\n    if n <= 0 {\n        return []\n    } else if n == 1 {\n        return [0]\n    } else if n == 2 {\n        return [0, 1]\n    }\n    \n    var fib = [0, 1]\n    for i in 2..<n {\n        fib.append(fib[i-1] + fib[i-2])\n    }\n    \n    return fib\n}\n\nprint(fibonacci(10))',
+                'kotlin': '// Kotlin sample code\n\nfun fibonacci(n: Int): List<Int> {\n    if (n <= 0) {\n        return emptyList()\n    } else if (n == 1) {\n        return listOf(0)\n    } else if (n == 2) {\n        return listOf(0, 1)\n    }\n    \n    val fib = mutableListOf(0, 1)\n    for (i in 2 until n) {\n        fib.add(fib[i-1] + fib[i-2])\n    }\n    \n    return fib\n}\n\nfun main() {\n    println(fibonacci(10).joinToString(" "))\n}'
+            };
+            return samples[language] || samples['python'];
+        }
+    });
+</script>
+{% endblock %}
