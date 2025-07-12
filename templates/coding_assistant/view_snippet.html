@@ -111,6 +111,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/ruby/ruby.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/go/go.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -125,8 +126,27 @@
         // Format feedback content with markdown
         const feedbacks = document.querySelectorAll('.feedback-content');
         feedbacks.forEach(feedback => {
-            feedback.innerHTML = marked.parse(feedback.textContent.trim());
+            // Get the original content and trim it
+            const originalContent = feedback.textContent.trim();
+            
+            // Configure marked.js options for better security and rendering
+            marked.setOptions({
+                breaks: true,        // Add line breaks in source as <br>
+                gfm: true,          // Use GitHub Flavored Markdown
+                headerIds: false,   // Don't add IDs to headers (for security)
+                sanitize: false,    // Let DOMPurify handle sanitization
+            });
+            
+            try {
+                // Parse markdown and sanitize the resulting HTML
+                const parsedContent = marked.parse(originalContent);
+                feedback.innerHTML = DOMPurify.sanitize(parsedContent);
+            } catch (error) {
+                console.error('Error parsing markdown:', error);
+                feedback.innerHTML = DOMPurify.sanitize(originalContent.replace(/\n/g, '<br>'));
+            }
         });
+        
         
         // Toggle public/private status
         const togglePublicBtn = document.getElementById('toggle-public-btn');
