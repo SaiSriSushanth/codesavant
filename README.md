@@ -110,15 +110,7 @@ codesavant/
 ## Technologies Used
 
 - Django: Web framework
-- OpenAI API: GPT-4-Turbo for code analysis
+- OpenAI API: GPT-3.5-Turbo for code analysis
 - CodeMirror: Code editor with syntax highlighting
 - Bootstrap 5: Frontend styling
 - SQLite: Database (default, can be changed)
-
-## License
-
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
