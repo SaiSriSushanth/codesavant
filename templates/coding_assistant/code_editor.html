@@ -262,9 +262,7 @@
             
             // Set sample code based on language
             const sampleCode = getSampleCode(language);
-            if (confirm('Change to sample code for ' + language + '?')) {
-                editor.setValue(sampleCode);
-            }
+            editor.setValue(sampleCode);
         });
 
         // Run code button

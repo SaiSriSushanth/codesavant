@@ -182,18 +182,15 @@
                             togglePublicBtn.innerHTML = '<i class="fas fa-lock me-1"></i> Make Public';
                         }
                         
-                        // Show success message
-                        const status = data.is_public ? 'public' : 'private';
-                        alert(`Snippet is now ${status}`);
+                        // Status change is already reflected in the button text and icon
                     } else {
                         // Show error and restore button
-                        alert('Error: ' + (data.error || 'Failed to update status'));
+                        console.error('Error: ' + (data.error || 'Failed to update status'));
                         togglePublicBtn.innerHTML = originalText;
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('An error occurred. Please try again.');
                     togglePublicBtn.innerHTML = originalText;
                 })
                 .finally(() => {

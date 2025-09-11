@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -666,7 +667,7 @@ def save_snippet(request):
             if not code:
                 return JsonResponse({'error': 'No code provided'}, status=400)
             
-            # Create or update code snippet
+     
             snippet, created = CodeSnippet.objects.get_or_create(
                 user=request.user,
                 title=title,
@@ -690,3 +691,22 @@ def save_snippet(request):
             return JsonResponse({'error': str(e)}, status=500)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+from .forms import SignUpForm
+
+
+def signup(request):
+    """User registration view"""
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            form.save()
+            username = form.cleaned_data.get('username')
+            raw_password = form.cleaned_data.get('password1')
+            user = authenticate(username=username, password=raw_password)
+            login(request, user)
+            return redirect('coding_assistant:dashboard')
+    else:
+        form = SignUpForm()
+    return render(request, 'coding_assistant/signup.html', {'form': form})
