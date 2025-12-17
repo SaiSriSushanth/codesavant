@@ -77,3 +77,30 @@ class Comment(models.Model):
     
     def __str__(self):
         return f"Comment by {self.user.username} on {self.code_snippet.title}"
+
+class Badge(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    icon = models.CharField(max_length=50)  # FontAwesome class, e.g., 'fas fa-trophy'
+    criteria = models.CharField(max_length=100)  # Internal code for checking criteria
+    xp_bonus = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return self.name
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    xp = models.IntegerField(default=0)
+    level = models.IntegerField(default=1)
+    badges = models.ManyToManyField(Badge, through='UserBadge', blank=True, related_name='awarded_users')
+    
+    def __str__(self):
+        return f"{self.user.username}'s Profile"
+
+class UserBadge(models.Model):
+    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
+    badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
+    awarded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('profile', 'badge')

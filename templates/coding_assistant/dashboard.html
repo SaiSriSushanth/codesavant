@@ -56,7 +56,37 @@
     <div class="col-md-4">
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-white">
-                <h4 class="mb-0">Your Progress</h4>
+                <h4 class="mb-0">Level & Badges</h4>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">Level {{ profile.level }}</h5>
+                    <small class="text-muted">{{ profile.xp }} XP</small>
+                </div>
+                <div class="progress mb-3" style="height: 10px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ profile.xp|modulo:100 }}%;"
+                        aria-valuenow="{{ profile.xp|modulo:100 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+
+                <h6 class="mb-2">Badges</h6>
+                {% if profile.userbadge_set.all %}
+                <div class="d-flex flex-wrap gap-2">
+                    {% for user_badge in profile.userbadge_set.all %}
+                    <span class="badge bg-warning text-dark" data-bs-toggle="tooltip" data-bs-html="true"
+                        title="<strong>{{ user_badge.badge.name }}</strong><br>{{ user_badge.badge.description }}<br><small>Awarded: {{ user_badge.awarded_at|date:'M d, Y' }}</small>">
+                        <i class="{{ user_badge.badge.icon }} me-1"></i> {{ user_badge.badge.name }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">No badges earned yet. Keep coding!</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">Your Skills</h4>
             </div>
             <div class="card-body">
                 {% if progress %}

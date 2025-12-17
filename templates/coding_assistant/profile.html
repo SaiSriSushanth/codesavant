@@ -27,6 +27,19 @@
                             <small class="text-muted">Likes</small>
                         </div>
                     </div>
+
+                    {% if profile.userbadge_set.all %}
+                    <hr>
+                    <h6 class="mb-3">Badges</h6>
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        {% for user_badge in profile.userbadge_set.all %}
+                        <span class="badge bg-warning text-dark" data-bs-toggle="tooltip" data-bs-html="true"
+                            title="<strong>{{ user_badge.badge.name }}</strong><br>{{ user_badge.badge.description }}<br><small>Awarded: {{ user_badge.awarded_at|date:'M d, Y' }}</small>">
+                            <i class="{{ user_badge.badge.icon }}"></i>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

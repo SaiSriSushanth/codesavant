@@ -14,6 +14,7 @@ import os
 import sys
 import traceback
 import re
+from .utils import award_xp, get_or_create_profile
 
 # Remove global API key initialization as we'll use client-based approach
 # openai.api_key = settings.OPENAI_API_KEY
@@ -27,10 +28,12 @@ def dashboard(request):
     """User dashboard view"""
     user_snippets = CodeSnippet.objects.filter(user=request.user, parent_snippet__isnull=True).order_by('-created_at')
     user_progress = UserProgress.objects.filter(user=request.user)
+    user_profile = get_or_create_profile(request.user)
     
     context = {
         'snippets': user_snippets,
         'progress': user_progress,
+        'profile': user_profile,
     }
     return render(request, 'coding_assistant/dashboard.html', context)
 
@@ -68,7 +71,9 @@ def analyze_code(request):
                     defaults={'code': code, 'language': language}
                 )
                 
-                if not created:
+                if created:
+                    award_xp(request.user, 50)  # 50 XP for new snippet
+                else:
                     snippet.code = code
                     snippet.language = language
                     snippet.save()
@@ -568,6 +573,8 @@ def save_snippet(request):
                 snippet.code = code
                 snippet.language = language
                 snippet.save()
+            else:
+                award_xp(request.user, 50)  # 50 XP for new snippet
             
             return JsonResponse({
                 'success': True,
@@ -674,6 +681,9 @@ def toggle_like(request):
             else:
                 snippet.likes.add(request.user)
                 is_liked = True
+                # Award XP to the snippet author (not the liker)
+                if snippet.user != request.user:
+                    award_xp(snippet.user, 10)  # 10 XP for receiving a like
                 
             return JsonResponse({
                 'success': True,
@@ -728,11 +738,13 @@ def user_profile(request, username):
     
     # Calculate stats
     total_likes = sum(snippet.likes.count() for snippet in public_snippets)
+    profile = get_or_create_profile(profile_user)
     
     context = {
         'profile_user': profile_user,
         'snippets': public_snippets,
         'total_likes': total_likes,
+        'profile': profile,
         'snippets_count': public_snippets.count(),
     }
     
