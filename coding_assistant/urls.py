@@ -17,4 +17,5 @@ urlpatterns = [
     path('api/add-comment/', views.add_comment, name='add_comment'),
     path('api/toggle-public/', views.toggle_public, name='toggle_public'),
     path('api/save-snippet/', views.save_snippet, name='save_snippet'),
+    path('api/chat/', views.chat_with_ai, name='chat_with_ai'),
 ]

@@ -160,127 +160,9 @@ def run_code(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 def execute_code(code, language):
-    """Execute code in a sandboxed environment with improved error handling"""
-    output = ''
-    error = ''
-    temp_file_path = None
-    
-    try:
-        # Create a temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=get_file_extension(language)) as temp_file:
-            temp_file.write(code.encode('utf-8'))
-            temp_file_path = temp_file.name
-        
-        # Execute the code based on language
-        if language == 'python':
-            # Run Python code
-            try:
-                # First check for syntax errors
-                compile(code, '<string>', 'exec')
-                
-                process = subprocess.Popen(
-                    [sys.executable, temp_file_path],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                stdout, stderr = process.communicate(timeout=5)  # 5 second timeout for safety
-                
-                if process.returncode != 0:
-                    error = format_error_message(stderr, language, code)
-                else:
-                    output = stdout
-                    if stderr:
-                        error = format_error_message(stderr, language, code)
-            except SyntaxError as e:
-                error = f"Syntax Error: {str(e)}"
-                line_num = e.lineno if hasattr(e, 'lineno') else 0
-                if line_num > 0:
-                    code_lines = code.split('\n')
-                    if line_num <= len(code_lines):
-                        error += f"\nLine {line_num}: {code_lines[line_num-1]}"
-                    else:
-                        error += f"\nLine {line_num}: (line not found)"
-            
-        elif language == 'javascript':
-            # Run JavaScript with Node.js
-            process = subprocess.Popen(
-                ['node', temp_file_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            stdout, stderr = process.communicate(timeout=5)  # 5 second timeout for safety
-            
-            if process.returncode != 0:
-                error = format_error_message(stderr, language, code)
-            else:
-                output = stdout
-                if stderr:
-                    error = format_error_message(stderr, language, code)
-        
-        elif language == 'ruby':
-            # Run Ruby code
-            process = subprocess.Popen(
-                ['ruby', temp_file_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            stdout, stderr = process.communicate(timeout=5)
-            
-            if process.returncode != 0:
-                error = format_error_message(stderr, language, code)
-            else:
-                output = stdout
-                if stderr:
-                    error = format_error_message(stderr, language, code)
-        
-        elif language == 'php':
-            # Run PHP code
-            process = subprocess.Popen(
-                ['php', temp_file_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            stdout, stderr = process.communicate(timeout=5)
-            
-            if process.returncode != 0:
-                error = format_error_message(stderr, language, code)
-            else:
-                output = stdout
-                if stderr:
-                    error = format_error_message(stderr, language, code)
-        
-        else:
-            # For unsupported languages, return an error
-            error = f"Language '{language}' is not supported for execution yet. Supported languages: Python, JavaScript, Ruby, PHP"
-    
-    except subprocess.TimeoutExpired:
-        error = "Execution timed out. Your code took too long to run (limit: 5 seconds)."
-    except FileNotFoundError as e:
-        if 'node' in str(e):
-            error = "Node.js is not installed or not in PATH. Please install Node.js to run JavaScript code."
-        elif 'ruby' in str(e):
-            error = "Ruby is not installed or not in PATH. Please install Ruby to run Ruby code."
-        elif 'php' in str(e):
-            error = "PHP is not installed or not in PATH. Please install PHP to run PHP code."
-        else:
-            error = f"Required interpreter not found: {str(e)}"
-    except PermissionError:
-        error = "Permission denied when trying to execute the code. Please check your system permissions."
-    except Exception as e:
-        error = f"Error executing code: {str(e)}"
-    finally:
-        # Clean up the temporary file
-        if temp_file_path:
-            try:
-                os.unlink(temp_file_path)
-            except:
-                pass
-    
-    return output, error
+    """Execute code in a sandboxed environment"""
+    from .sandbox import run_in_sandbox
+    return run_in_sandbox(code, language)
 
 def format_error_message(error_text, language, code):
     """Format error messages to be more user-friendly and include line numbers"""
@@ -710,3 +592,56 @@ def signup(request):
     else:
         form = SignUpForm()
     return render(request, 'coding_assistant/signup.html', {'form': form})
+
+@csrf_exempt
+def chat_with_ai(request):
+    """API endpoint for interactive chat with AI"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            message = data.get('message', '')
+            code = data.get('code', '')
+            language = data.get('language', 'python')
+            history = data.get('history', [])
+            
+            if not message:
+                return JsonResponse({'error': 'No message provided'}, status=400)
+            
+            # Prepare messages for OpenAI
+            messages = [
+                {"role": "system", "content": f"You are an expert programming assistant. The user is working on {language} code. Be helpful, concise, and educational."}
+            ]
+            
+            # Add context about the code
+            if code:
+                messages.append({"role": "system", "content": f"Current code in editor:\n```{language}\n{code}\n```"})
+            
+            # Add conversation history
+            for msg in history:
+                role = "user" if msg.get('is_user') else "assistant"
+                messages.append({"role": role, "content": msg.get('text', '')})
+            
+            # Add current message
+            messages.append({"role": "user", "content": message})
+            
+            # Call OpenAI API
+            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+            response = client.chat.completions.create(
+                model=settings.GPT_MODEL,
+                messages=messages,
+                max_tokens=1000,
+                temperature=0.7,
+            )
+            
+            ai_response = response.choices[0].message.content
+            
+            return JsonResponse({
+                'response': ai_response
+            })
+            
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
