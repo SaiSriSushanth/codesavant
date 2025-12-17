@@ -345,31 +345,49 @@
             autofocus: true
         });
 
-        // Set initial sample code
-        editor.setValue('# Write your code here\n\ndef hello_world():\n    print("Hello, World!")\n\nhello_world()');
-
         // Language selector
         const languageSelect = document.getElementById('language-select');
+
+        // Define modeMap for reuse
+        const modeMap = {
+            'python': 'python',
+            'javascript': 'javascript',
+            'java': 'text/x-java',
+            'cpp': 'text/x-c++src',
+            'csharp': 'text/x-csharp',
+            'php': 'php',
+            'ruby': 'ruby',
+            'go': 'go',
+            'swift': 'text/x-swift',
+            'kotlin': 'text/x-kotlin'
+        };
+
         languageSelect.addEventListener('change', function () {
             const language = this.value;
-            const modeMap = {
-                'python': 'python',
-                'javascript': 'javascript',
-                'java': 'text/x-java',
-                'cpp': 'text/x-c++src',
-                'csharp': 'text/x-csharp',
-                'php': 'php',
-                'ruby': 'ruby',
-                'go': 'go',
-                'swift': 'text/x-swift',
-                'kotlin': 'text/x-kotlin'
-            };
             editor.setOption('mode', modeMap[language] || 'python');
 
             // Set sample code based on language
             const sampleCode = getSampleCode(language);
             editor.setValue(sampleCode);
         });
+
+        {% if snippet %}
+        // Load existing snippet
+        document.getElementById('code-title').value = "{{ snippet.title|escapejs }}";
+        const savedLanguage = "{{ snippet.language }}";
+
+        // Set language in dropdown
+        languageSelect.value = savedLanguage;
+
+        // Set editor mode
+        editor.setOption('mode', modeMap[savedLanguage] || 'python');
+
+        // Set editor content
+        editor.setValue("{{ snippet.code|escapejs }}");
+        {% else %}
+        // Set initial sample code
+        editor.setValue('# Write your code here\n\ndef hello_world():\n    print("Hello, World!")\n\nhello_world()');
+        {% endif %}
 
         // Run code button
         document.getElementById('run-code').addEventListener('click', function () {

@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ profile_user.username }}'s Profile - CodeSavant{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <!-- Profile Sidebar -->
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-user-circle fa-5x text-secondary"></i>
+                    </div>
+                    <h3 class="card-title">{{ profile_user.username }}</h3>
+                    <p class="text-muted">Member since {{ profile_user.date_joined|date:"F Y" }}</p>
+
+                    <hr>
+
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h5>{{ snippets_count }}</h5>
+                            <small class="text-muted">Snippets</small>
+                        </div>
+                        <div class="col-6">
+                            <h5>{{ total_likes }}</h5>
+                            <small class="text-muted">Likes</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Public Snippets -->
+        <div class="col-md-8">
+            <h4 class="mb-4"><i class="fas fa-code me-2"></i>Public Snippets</h4>
+
+            {% if snippets %}
+            <div class="row">
+                {% for snippet in snippets %}
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="badge bg-primary">{{ snippet.language }}</span>
+                            <small class="text-muted">{{ snippet.created_at|date:"M d, Y" }}</small>
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title text-truncate">{{ snippet.title }}</h5>
+                            <p class="card-text text-muted small">
+                                <i class="fas fa-heart me-1 text-danger"></i> {{ snippet.likes.count }} likes
+                                {% if snippet.parent_snippet %}
+                                <br>
+                                <i class="fas fa-code-branch me-1 text-muted"></i> Forked from {{
+                                snippet.parent_snippet.user.username }}
+                                {% endif %}
+                            </p>
+                            <a href="{% url 'coding_assistant:public_snippet' snippet.id %}"
+                                class="btn btn-outline-primary btn-sm stretched-link">View Code</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>This user hasn't shared any public snippets yet.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

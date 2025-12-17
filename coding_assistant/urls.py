@@ -18,4 +18,7 @@ urlpatterns = [
     path('api/toggle-public/', views.toggle_public, name='toggle_public'),
     path('api/save-snippet/', views.save_snippet, name='save_snippet'),
     path('api/chat/', views.chat_with_ai, name='chat_with_ai'),
+    path('api/toggle-like/', views.toggle_like, name='toggle_like'),
+    path('api/fork-snippet/', views.fork_snippet, name='fork_snippet'),
+    path('profile/<str:username>/', views.user_profile, name='user_profile'),
 ]

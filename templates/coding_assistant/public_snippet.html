@@ -110,8 +110,22 @@
             <div class="card mb-4 shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
                     <h5 class="mb-0"><i class="fas fa-code me-2"></i>{{ snippet.title }}</h5>
-                    <a href="{% url 'coding_assistant:explore' %}" class="btn btn-sm btn-outline-light"><i
-                            class="fas fa-arrow-left me-1"></i>Back to Explore</a>
+                    <div class="d-flex align-items-center">
+                        {% if user.is_authenticated %}
+                        <button id="like-btn" class="btn btn-sm btn-outline-light me-2"
+                            data-snippet-id="{{ snippet.id }}">
+                            <i
+                                class="{% if request.user in snippet.likes.all %}fas{% else %}far{% endif %} fa-heart me-1"></i>
+                            <span id="likes-count">{{ snippet.likes.count }}</span>
+                        </button>
+                        <button id="fork-btn" class="btn btn-sm btn-outline-light me-2"
+                            data-snippet-id="{{ snippet.id }}">
+                            <i class="fas fa-code-branch me-1"></i>Fork
+                        </button>
+                        {% endif %}
+                        <a href="{% url 'coding_assistant:explore' %}" class="btn btn-sm btn-outline-light"><i
+                                class="fas fa-arrow-left me-1"></i>Back to Explore</a>
+                    </div>
                 </div>
                 <div class="card-header bg-light">
                     <div class="d-flex justify-content-between align-items-center">
@@ -548,6 +562,84 @@
                 'kotlin': 'text/x-kotlin'
             };
             return modeMap[language.toLowerCase()] || 'python';
+        }
+
+        // Like button handler
+        const likeBtn = document.getElementById('like-btn');
+        if (likeBtn) {
+            likeBtn.addEventListener('click', function () {
+                const snippetId = this.dataset.snippetId;
+                const icon = this.querySelector('i');
+                const countSpan = document.getElementById('likes-count');
+
+                fetch('{% url "coding_assistant:toggle_like" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ snippet_id: snippetId })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (data.is_liked) {
+                                icon.classList.remove('far');
+                                icon.classList.add('fas');
+                            } else {
+                                icon.classList.remove('fas');
+                                icon.classList.add('far');
+                            }
+                            countSpan.textContent = data.likes_count;
+                        } else {
+                            showToast('Error: ' + data.error, 'danger');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showToast('An error occurred', 'danger');
+                    });
+            });
+        }
+
+        // Fork button handler
+        const forkBtn = document.getElementById('fork-btn');
+        if (forkBtn) {
+            forkBtn.addEventListener('click', function () {
+                const snippetId = this.dataset.snippetId;
+
+                // Disable button to prevent double clicks
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Forking...';
+
+                fetch('{% url "coding_assistant:fork_snippet" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ snippet_id: snippetId })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showToast('Snippet forked successfully! Redirecting...', 'success');
+                            setTimeout(() => {
+                                window.location.href = `/code-editor/?id=${data.snippet_id}`;
+                            }, 1500);
+                        } else {
+                            showToast('Error: ' + data.error, 'danger');
+                            this.disabled = false;
+                            this.innerHTML = '<i class="fas fa-code-branch me-1"></i>Fork';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showToast('An error occurred', 'danger');
+                        this.disabled = false;
+                        this.innerHTML = '<i class="fas fa-code-branch me-1"></i>Fork';
+                    });
+            });
         }
     });
 </script>

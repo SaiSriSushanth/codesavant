@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -24,7 +25,7 @@ def index(request):
 @login_required
 def dashboard(request):
     """User dashboard view"""
-    user_snippets = CodeSnippet.objects.filter(user=request.user).order_by('-created_at')
+    user_snippets = CodeSnippet.objects.filter(user=request.user, parent_snippet__isnull=True).order_by('-created_at')
     user_progress = UserProgress.objects.filter(user=request.user)
     
     context = {
@@ -36,7 +37,14 @@ def dashboard(request):
 @login_required
 def code_editor(request):
     """Code editor view"""
-    return render(request, 'coding_assistant/code_editor.html')
+    snippet_id = request.GET.get('id')
+    context = {}
+    
+    if snippet_id:
+        snippet = get_object_or_404(CodeSnippet, id=snippet_id, user=request.user)
+        context['snippet'] = snippet
+        
+    return render(request, 'coding_assistant/code_editor.html', context)
 
 @csrf_exempt
 def analyze_code(request):
@@ -645,3 +653,87 @@ def chat_with_ai(request):
             return JsonResponse({'error': str(e)}, status=500)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+@csrf_exempt
+def toggle_like(request):
+    """API endpoint to toggle like on a snippet"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            snippet_id = data.get('snippet_id')
+            
+            if not snippet_id:
+                return JsonResponse({'error': 'Missing snippet ID'}, status=400)
+            
+            snippet = get_object_or_404(CodeSnippet, id=snippet_id, is_public=True)
+            
+            if request.user in snippet.likes.all():
+                snippet.likes.remove(request.user)
+                is_liked = False
+            else:
+                snippet.likes.add(request.user)
+                is_liked = True
+                
+            return JsonResponse({
+                'success': True,
+                'is_liked': is_liked,
+                'likes_count': snippet.likes.count()
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+            
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+@csrf_exempt
+def fork_snippet(request):
+    """API endpoint to fork a snippet"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            snippet_id = data.get('snippet_id')
+            
+            if not snippet_id:
+                return JsonResponse({'error': 'Missing snippet ID'}, status=400)
+            
+            original_snippet = get_object_or_404(CodeSnippet, id=snippet_id, is_public=True)
+            
+            # Create a copy
+            new_snippet = CodeSnippet.objects.create(
+                user=request.user,
+                title=f"Fork of {original_snippet.title}",
+                code=original_snippet.code,
+                language=original_snippet.language,
+                parent_snippet=original_snippet,
+                is_public=False # Private by default
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'snippet_id': new_snippet.id,
+                'message': 'Snippet forked successfully'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+            
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+def user_profile(request, username):
+    """Public user profile view"""
+    profile_user = get_object_or_404(User, username=username)
+    public_snippets = CodeSnippet.objects.filter(user=profile_user, is_public=True).order_by('-created_at')
+    
+    # Calculate stats
+    total_likes = sum(snippet.likes.count() for snippet in public_snippets)
+    
+    context = {
+        'profile_user': profile_user,
+        'snippets': public_snippets,
+        'total_likes': total_likes,
+        'snippets_count': public_snippets.count(),
+    }
+    
+    return render(request, 'coding_assistant/profile.html', context)

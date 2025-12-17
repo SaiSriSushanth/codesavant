@@ -41,28 +41,38 @@
 
 <div class="row">
     {% if snippets %}
-        {% for snippet in snippets %}
-        <div class="col-md-6 col-lg-4 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0 text-truncate" title="{{ snippet.title }}">{{ snippet.title }}</h5>
-                        <span class="badge bg-secondary">{{ snippet.language }}</span>
-                    </div>
+    {% for snippet in snippets %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-truncate" title="{{ snippet.title }}">{{ snippet.title }}</h5>
+                    <span class="badge bg-secondary">{{ snippet.language }}</span>
                 </div>
-                <div class="card-body">
-                    <p class="card-text text-muted small mb-2">By {{ snippet.user.username }} on {{ snippet.created_at|date:"M d, Y" }}</p>
-                    <div class="code-preview mb-3">
-                        <pre class="bg-light p-2 rounded"><code>{{ snippet.code|truncatechars:150 }}</code></pre>
+            </div>
+            <div class="card-body">
+                <p class="card-text text-muted small mb-2">
+                    By <a href="{% url 'coding_assistant:user_profile' snippet.user.username %}" class="text-decoration-none">{{ snippet.user.username }}</a> 
+                    on {{ snippet.created_at|date:"M d, Y" }}
+                    {% if snippet.parent_snippet %}
+                    <br>
+                    <i class="fas fa-code-branch me-1 text-muted"></i> Forked
+                    {% endif %}
+                </p>
+                <div class="code-preview mb-3">
+                    <pre class="bg-light p-2 rounded"><code>{{ snippet.code|truncatechars:150 }}</code></pre>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small me-2" title="Comments"><i class="far fa-comment me-1"></i>{{ snippet.comments.count }}</span>
+                        <span class="text-muted small" title="Likes"><i class="far fa-heart me-1"></i>{{ snippet.likes.count }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted small">{{ snippet.comments.count }} comment{{ snippet.comments.count|pluralize }}</span>
-                        <a href="{% url 'coding_assistant:public_snippet' snippet.id %}" class="btn btn-sm btn-primary">View Details</a>
-                    </div>
+                    <a href="{% url 'coding_assistant:public_snippet' snippet.id %}" class="btn btn-sm btn-primary">View Details</a>
                 </div>
             </div>
         </div>
-        {% endfor %}
+    </div>
+    {% endfor %}
     {% else %}
     <div class="col-12">
         <div class="alert alert-info text-center">

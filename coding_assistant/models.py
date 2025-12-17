@@ -7,6 +7,8 @@ class CodeSnippet(models.Model):
     code = models.TextField()
     language = models.CharField(max_length=50)
     is_public = models.BooleanField(default=False)
+    likes = models.ManyToManyField(User, related_name='liked_snippets', blank=True)
+    parent_snippet = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='forks')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
