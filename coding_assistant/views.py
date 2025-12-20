@@ -428,12 +428,32 @@ def view_snippet(request, snippet_id):
 
 def explore(request):
     """Explore public code snippets"""
-    public_snippets = CodeSnippet.objects.filter(is_public=True).order_by('-created_at')
+    public_snippets = CodeSnippet.objects.filter(is_public=True)
+    
+    # Search functionality
+    query = request.GET.get('q')
+    if query:
+        from django.db.models import Q
+        public_snippets = public_snippets.filter(
+            Q(title__icontains=query) | 
+            Q(code__icontains=query) |
+            Q(language__icontains=query)
+        )
     
     # Filter by language if specified
     language = request.GET.get('language')
     if language:
         public_snippets = public_snippets.filter(language=language)
+        
+    # Sorting
+    sort = request.GET.get('sort', 'latest')
+    if sort == 'oldest':
+        public_snippets = public_snippets.order_by('created_at')
+    elif sort == 'most_liked':
+        from django.db.models import Count
+        public_snippets = public_snippets.annotate(like_count=Count('likes')).order_by('-like_count')
+    else: # latest
+        public_snippets = public_snippets.order_by('-created_at')
     
     # Get unique languages for filter dropdown
     languages = CodeSnippet.objects.filter(is_public=True).values_list('language', flat=True).distinct()
@@ -442,6 +462,8 @@ def explore(request):
         'snippets': public_snippets,
         'languages': languages,
         'selected_language': language,
+        'query': query,
+        'sort': sort,
     }
     
     return render(request, 'coding_assistant/explore.html', context)
@@ -749,3 +771,142 @@ def user_profile(request, username):
     }
     
     return render(request, 'coding_assistant/profile.html', context)
+
+@login_required
+def challenges(request):
+    """List coding challenges"""
+    difficulty = request.GET.get('difficulty')
+    challenges_list = CodingChallenge.objects.all().order_by('-created_at')
+    
+    if difficulty:
+        challenges_list = challenges_list.filter(difficulty=difficulty)
+        
+    context = {
+        'challenges': challenges_list,
+        'selected_difficulty': difficulty,
+    }
+    return render(request, 'coding_assistant/challenges.html', context)
+
+@login_required
+def challenge_detail(request, challenge_id):
+    """View and solve a coding challenge"""
+    challenge = get_object_or_404(CodingChallenge, id=challenge_id)
+    return render(request, 'coding_assistant/challenge_detail.html', {'challenge': challenge})
+
+@login_required
+@csrf_exempt
+def generate_challenge(request):
+    """API endpoint to generate a custom coding challenge"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            language = data.get('language', 'python')
+            difficulty = data.get('difficulty', 'INTERMEDIATE')
+            topic = data.get('topic', 'General')
+            
+            prompt = f"Create a unique {difficulty} level coding challenge for {language} focusing on {topic}. Include a title, description, starter code, solution, and hidden test criteria for an AI judge. Format as JSON with keys: title, description, starter_code, solution, test_criteria."
+            
+            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+            response = client.chat.completions.create(
+                model=settings.GPT_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are an expert programming educator who creates engaging coding challenges."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1500,
+                temperature=0.8,
+            )
+            
+            ai_response = response.choices[0].message.content
+            
+            # Parse JSON
+            if '```json' in ai_response:
+                ai_response = ai_response.split('```json')[1].split('```')[0].strip()
+            
+            challenge_data = json.loads(ai_response)
+            
+            challenge = CodingChallenge.objects.create(
+                title=challenge_data.get('title', f"{topic} Challenge"),
+                description=challenge_data.get('description', ''),
+                difficulty=difficulty,
+                starter_code=challenge_data.get('starter_code', ''),
+                solution=challenge_data.get('solution', ''),
+                test_criteria=challenge_data.get('test_criteria', ''),
+                tags=f"{language},{difficulty},{topic}",
+                is_ai_generated=True,
+                generation_prompt=prompt
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'challenge_id': challenge.id
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+            
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@login_required
+@csrf_exempt
+def submit_solution(request):
+    """API endpoint to submit a solution to the AI Judge"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            challenge_id = data.get('challenge_id')
+            user_code = data.get('code')
+            
+            challenge = get_object_or_404(CodingChallenge, id=challenge_id)
+            
+            # AI Judge Prompt
+            judge_prompt = f"""
+            You are an AI Code Judge. Evaluate the user's solution for the following challenge:
+            
+            Title: {challenge.title}
+            Description: {challenge.description}
+            Test Criteria: {challenge.test_criteria}
+            
+            User's Code:
+            ```{challenge.tags.split(',')[0]}
+            {user_code}
+            ```
+            
+            Evaluate for:
+            1. Correctness (Does it solve the problem?)
+            2. Efficiency (Is it optimal?)
+            3. Style (Clean code?)
+            
+            Return JSON with keys:
+            - passed (boolean)
+            - feedback (string, helpful feedback)
+            - rating (integer 1-10)
+            """
+            
+            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+            response = client.chat.completions.create(
+                model=settings.GPT_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are a strict but fair AI Code Judge."},
+                    {"role": "user", "content": judge_prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.3,
+            )
+            
+            ai_response = response.choices[0].message.content
+            
+            if '```json' in ai_response:
+                ai_response = ai_response.split('```json')[1].split('```')[0].strip()
+                
+            result = json.loads(ai_response)
+            
+            if result.get('passed'):
+                award_xp(request.user, 100) # Award 100 XP for passing
+                
+            return JsonResponse(result)
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+            
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

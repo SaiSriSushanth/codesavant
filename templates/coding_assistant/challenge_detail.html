@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ challenge.title }} - CodeSavant{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+<style>
+    .editor-container {
+        height: 500px;
+    }
+
+    .CodeMirror {
+        height: 100%;
+        font-size: 14px;
+    }
+
+    .output-container {
+        height: 150px;
+        overflow-y: auto;
+        background-color: #282a36;
+        color: #f8f8f2;
+        font-family: monospace;
+        padding: 10px;
+        border-radius: 0 0 4px 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'coding_assistant:challenges' %}">Challenges</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ challenge.title }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Challenge Description -->
+    <div class="col-lg-5 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{{ challenge.title }}</h4>
+                    <span class="badge 
+                        {% if challenge.difficulty == 'BEGINNER' %}bg-success
+                        {% elif challenge.difficulty == 'INTERMEDIATE' %}bg-warning text-dark
+                        {% else %}bg-danger{% endif %}">
+                        {{ challenge.difficulty|title }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="challenge-description">
+                    {{ challenge.description|linebreaks }}
+                </div>
+
+                <hr>
+                <h5>Instructions</h5>
+                <ul>
+                    <li>Read the problem statement carefully.</li>
+                    <li>Write your solution in the editor.</li>
+                    <li>Click <strong>Submit Solution</strong> to have the AI Judge evaluate your code.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code Editor -->
+    <div class="col-lg-7 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Solution Editor</span>
+                <span class="badge bg-secondary">Python</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="editor-container">
+                    <textarea id="code-editor">{{ challenge.starter_code }}</textarea>
+                </div>
+                <div class="output-container" id="code-output">
+                    <div class="text-muted">// AI Judge feedback will appear here...</div>
+                </div>
+            </div>
+            <div class="card-footer bg-white">
+                <div class="d-flex justify-content-end gap-2">
+                    <button id="reset-code" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo me-1"></i> Reset
+                    </button>
+                    <button id="submit-solution" class="btn btn-success">
+                        <i class="fas fa-gavel me-1"></i> Submit Solution
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+            lineNumbers: true,
+            mode: 'python',
+            theme: 'dracula',
+            matchBrackets: true,
+            indentUnit: 4,
+            tabSize: 4,
+            indentWithTabs: false,
+            lineWrapping: true,
+            autofocus: true
+        });
+
+        const outputDiv = document.getElementById('code-output');
+        const submitBtn = document.getElementById('submit-solution');
+
+        // Reset Code
+        document.getElementById('reset-code').addEventListener('click', function () {
+            if (confirm('Reset to starter code?')) {
+                editor.setValue(`{{ challenge.starter_code|escapejs }}`);
+            }
+        });
+
+        // Submit Solution to AI Judge
+        submitBtn.addEventListener('click', function () {
+            const code = editor.getValue();
+            const originalText = submitBtn.innerHTML;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-gavel fa-spin me-1"></i> Judging...';
+            outputDiv.innerHTML = '<div class="text-info">Submitting to AI Judge...</div>';
+
+            fetch('{% url "coding_assistant:submit_solution" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    challenge_id: {{ challenge.id }},
+                code: code
+                })
+    })
+        .then(response => response.json())
+        .then(data => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+
+            if (data.error) {
+                outputDiv.innerHTML = `<div class="text-danger">Error: ${data.error}</div>`;
+            } else {
+                let resultClass = data.passed ? 'text-success' : 'text-warning';
+                let icon = data.passed ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-exclamation-circle"></i>';
+
+                let feedbackHtml = `
+                            <div class="${resultClass} mb-2"><strong>${icon} ${data.passed ? 'Passed!' : 'Needs Improvement'}</strong></div>
+                            <div class="mb-2"><strong>Rating:</strong> ${data.rating}/10</div>
+                            <div class="text-white small">${data.feedback.replace(/\n/g, '<br>')}</div>
+                        `;
+
+                outputDiv.innerHTML = feedbackHtml;
+
+                if (data.passed) {
+                    awardXP();
+                }
+            }
+        })
+        .catch(error => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+            outputDiv.innerHTML = `<div class="text-danger">System Error: ${error.message}</div>`;
+        });
+        });
+
+    function awardXP() {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+        alertDiv.style.zIndex = 1050;
+        alertDiv.innerHTML = `
+                <strong><i class="fas fa-trophy"></i> Challenge Completed!</strong> 
+                You've earned 100 XP!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+    });
+</script>
+{% endblock %}

@@ -372,21 +372,21 @@
         });
 
         {% if snippet %}
-        // Load existing snippet
-        document.getElementById('code-title').value = "{{ snippet.title|escapejs }}";
-        const savedLanguage = "{{ snippet.language }}";
+            // Load existing snippet
+            document.getElementById('code-title').value = "{{ snippet.title|escapejs }}";
+            const savedLanguage = "{{ snippet.language }}";
 
-        // Set language in dropdown
-        languageSelect.value = savedLanguage;
+            // Set language in dropdown
+            languageSelect.value = savedLanguage;
 
-        // Set editor mode
-        editor.setOption('mode', modeMap[savedLanguage] || 'python');
+            // Set editor mode
+            editor.setOption('mode', modeMap[savedLanguage] || 'python');
 
-        // Set editor content
-        editor.setValue("{{ snippet.code|escapejs }}");
+            // Set editor content
+            editor.setValue("{{ snippet.code|escapejs }}");
         {% else %}
-        // Set initial sample code
-        editor.setValue('# Write your code here\n\ndef hello_world():\n    print("Hello, World!")\n\nhello_world()');
+            // Set initial sample code
+            editor.setValue('# Write your code here\n\ndef hello_world():\n    print("Hello, World!")\n\nhello_world()');
         {% endif %}
 
         // Run code button

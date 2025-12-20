@@ -63,6 +63,9 @@ class CodingChallenge(models.Model):
     starter_code = models.TextField(blank=True)
     solution = models.TextField()
     tags = models.CharField(max_length=200)  # Comma-separated tags
+    is_ai_generated = models.BooleanField(default=False)
+    generation_prompt = models.TextField(blank=True, null=True)
+    test_criteria = models.TextField(blank=True, null=True)  # Instructions for the AI Judge
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):

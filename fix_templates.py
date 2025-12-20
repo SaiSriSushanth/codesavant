@@ -1,4 +1,6 @@
-{% extends 'base.html' %}
+import os
+
+explore_content = """{% extends 'base.html' %}
 
 {% block title %}Explore Code Snippets - CodeSavant{% endblock %}
 
@@ -125,3 +127,100 @@
     }
 </style>
 {% endblock %}
+"""
+
+challenges_content = """{% extends 'base.html' %}
+
+{% block title %}Coding Challenges - CodeSavant{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12 text-center">
+        <h1 class="mb-3">Coding Challenges Arena ⚔️</h1>
+        <p class="lead">Test your skills, solve problems, and earn XP!</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-center justify-content-center">
+                    <div class="col-auto">
+                        <label class="col-form-label fw-bold">Filter by:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select name="difficulty" class="form-select">
+                            <option value="">All Difficulties</option>
+                            <option value="BEGINNER" {% if selected_difficulty == 'BEGINNER' %}selected{% endif %}>Beginner</option>
+                            <option value="INTERMEDIATE" {% if selected_difficulty == 'INTERMEDIATE' %}selected{% endif %}>Intermediate</option>
+                            <option value="ADVANCED" {% if selected_difficulty == 'ADVANCED' %}selected{% endif %}>Advanced</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">Apply</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    {% if challenges %}
+    {% for challenge in challenges %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100 shadow-sm border-0 hover-shadow transition-all">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="badge 
+                        {% if challenge.difficulty == 'BEGINNER' %}bg-success
+                        {% elif challenge.difficulty == 'INTERMEDIATE' %}bg-warning text-dark
+                        {% else %}bg-danger{% endif %}">
+                        {{ challenge.difficulty|title }}
+                    </span>
+                    <small class="text-muted"><i class="fas fa-code me-1"></i> {{ challenge.tags }}</small>
+                </div>
+                <h5 class="card-title">{{ challenge.title }}</h5>
+                <p class="card-text text-muted">{{ challenge.description|truncatechars:100 }}</p>
+                <a href="{% url 'coding_assistant:challenge_detail' challenge.id %}" class="btn btn-outline-primary w-100 mt-3">
+                    Solve Challenge <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="col-12 text-center py-5">
+        <div class="text-muted">
+            <i class="fas fa-laptop-code fa-3x mb-3"></i>
+            <h4>No challenges found</h4>
+            <p>Try adjusting your filters or check back later!</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    .transition-all {
+        transition: all 0.3s ease;
+    }
+</style>
+{% endblock %}
+"""
+
+base_dir = r"c:\Users\SUSHANTH\OneDrive\Desktop\CS2\templates\coding_assistant"
+
+with open(os.path.join(base_dir, "explore.html"), "w", encoding="utf-8") as f:
+    f.write(explore_content)
+    print("Updated explore.html")
+
+with open(os.path.join(base_dir, "challenges.html"), "w", encoding="utf-8") as f:
+    f.write(challenges_content)
+    print("Updated challenges.html")

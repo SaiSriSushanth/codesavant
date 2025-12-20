@@ -20,5 +20,9 @@ urlpatterns = [
     path('api/chat/', views.chat_with_ai, name='chat_with_ai'),
     path('api/toggle-like/', views.toggle_like, name='toggle_like'),
     path('api/fork-snippet/', views.fork_snippet, name='fork_snippet'),
+    path('challenges/', views.challenges, name='challenges'),
+    path('challenges/<int:challenge_id>/', views.challenge_detail, name='challenge_detail'),
+    path('api/generate-challenge/', views.generate_challenge, name='generate_challenge'),
+    path('api/submit-solution/', views.submit_solution, name='submit_solution'),
     path('profile/<str:username>/', views.user_profile, name='user_profile'),
 ]
